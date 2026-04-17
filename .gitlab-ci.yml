@@ -4,13 +4,13 @@ stages:
   - release
 
 # Needed for Docker in docker build
-image: moreillon/ci-dind
+image: moreillon/ci-dind:4bca50d7
 services:
   - name: docker:24.0.7-dind
 
 variables:
   APPLICATION_NAME: group-manager
-  CONTAINER_REGISTRY: ${DOCKER_HUB_USERNAME}
+  CONTAINER_REGISTRY: ${AWS_ECR_PUBLIC_URL}
   CONTAINER_IMAGE: ${CONTAINER_REGISTRY}/${APPLICATION_NAME}
   CONTAINER_IMAGE_TEST: ${CONTAINER_IMAGE}:test
   CONTAINER_IMAGE_LATEST: ${CONTAINER_IMAGE}:latest
@@ -22,8 +22,12 @@ build:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
     - if: $CI_COMMIT_BRANCH == "master"
   before_script:
-    # Docker hub login
-    - echo "${DOCKER_HUB_PASSWORD}" | docker login --username ${DOCKER_HUB_USERNAME} --password-stdin
+    # Registry login
+    - aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${AWS_ECR_PUBLIC_URL}
+    # Create repository in ECR if it does not exist yet
+    - >
+      aws ecr-public create-repository --region us-east-1 --repository-name ${APPLICATION_NAME}
+      || echo "Repository might have already existed"
   script:
     - docker build -t ${CONTAINER_IMAGE_TEST} .
     - docker push ${CONTAINER_IMAGE_TEST}
@@ -35,8 +39,8 @@ test:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
     - if: $CI_COMMIT_BRANCH == "master"
   before_script:
-    - echo "${DOCKER_HUB_PASSWORD}" | docker login --username ${DOCKER_HUB_USERNAME} --password-stdin
-      # Creating network for TDD
+    - aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${AWS_ECR_PUBLIC_URL}
+    # Creating network for TDD
     - docker network create tdd
     # Creating DB container in network
     - >
@@ -80,7 +84,7 @@ release:
   rules:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
   before_script:
-    - echo "${DOCKER_HUB_PASSWORD}" | docker login --username ${DOCKER_HUB_USERNAME} --password-stdin
+    - aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${AWS_ECR_PUBLIC_URL}
   script:
     - docker pull ${CONTAINER_IMAGE_TEST}
     # Tagging
