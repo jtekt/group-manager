@@ -1,8 +1,3 @@
-stages:
-  - build
-  - test
-  - release
-
 # Needed for Docker in docker build
 image: moreillon/ci-dind:4bca50d7
 services:
@@ -14,12 +9,13 @@ variables:
   CONTAINER_IMAGE: ${CONTAINER_REGISTRY}/${APPLICATION_NAME}
   CONTAINER_IMAGE_TEST: ${CONTAINER_IMAGE}:test
   CONTAINER_IMAGE_LATEST: ${CONTAINER_IMAGE}:latest
-  CONTAINER_IMAGE_TAGGED: ${CONTAINER_IMAGE}:${CI_COMMIT_TAG}
+  # CONTAINER_IMAGE_TAGGED: ${CONTAINER_IMAGE}:${CI_COMMIT_TAG}
+  CONTAINER_IMAGE_TAGGED: ${CONTAINER_IMAGE}:${CI_COMMIT_SHORT_SHA}
 
 build:
   stage: build
   rules:
-    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+    # - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
     - if: $CI_COMMIT_BRANCH == "master"
   before_script:
     # Registry login
@@ -36,7 +32,7 @@ test:
   stage: test
   coverage: '/All files[^|]*\|[^|]*\s+([\d\.]+)/'
   rules:
-    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+    # - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
     - if: $CI_COMMIT_BRANCH == "master"
   before_script:
     - aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${AWS_ECR_PUBLIC_URL}
@@ -82,7 +78,8 @@ test:
 release:
   stage: release
   rules:
-    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+    # - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+    - if: $CI_COMMIT_BRANCH == "master"
   before_script:
     - aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${AWS_ECR_PUBLIC_URL}
   script:
@@ -93,3 +90,14 @@ release:
     # Pushing
     - docker push ${CONTAINER_IMAGE_TAGGED}
     - docker push ${CONTAINER_IMAGE_LATEST}
+
+deploy:
+  stage: deploy
+  rules:
+    # - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+    - if: $CI_COMMIT_BRANCH == "master"
+  before_script:
+    - kubectl config use-context eks/gitlab-agent-for-kubernetes:eks
+    - kubectl config set-context --current --namespace=moreillon
+  script:
+    - envsubst < kubernetes_manifest.yml | kubectl apply -f -
