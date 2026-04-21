@@ -74,17 +74,7 @@ test:
       --env TEST_USER_PASSWORD=admin
       ${CONTAINER_IMAGE_TEST}
       npm run coverage
-
-release:
-  stage: release
-  rules:
-    # - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
-    - if: $CI_COMMIT_BRANCH == "master"
-  before_script:
-    - aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${AWS_ECR_PUBLIC_URL}
-  script:
-    - docker pull ${CONTAINER_IMAGE_TEST}
-    # Tagging
+    # If tests pass, release
     - docker tag ${CONTAINER_IMAGE_TEST} ${CONTAINER_IMAGE_TAGGED}
     - docker tag ${CONTAINER_IMAGE_TEST} ${CONTAINER_IMAGE_LATEST}
     # Pushing
