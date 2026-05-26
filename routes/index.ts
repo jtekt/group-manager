@@ -10,6 +10,7 @@ import healthRouter from "./health";
 import {
   IDENTIFICATION_URL,
   OIDC_JWKS_URI,
+  API_KEY_MANAGER_URL,
   dbUserIdentifiers,
   authUserIdentifiers,
 } from "../config";
@@ -29,6 +30,7 @@ router.get("/", async (req, res) => {
     auth: {
       identification_url: IDENTIFICATION_URL,
       oidc_jwks_uri: OIDC_JWKS_URI,
+      api_key_manager_url: API_KEY_MANAGER_URL,
       dbUserIdentifiers,
       authUserIdentifiers,
     },
