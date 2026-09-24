@@ -1,4 +1,5 @@
 export const {
+  APP_VERSION = "dev",
   DEFAULT_BATCH_SIZE = 100,
   APP_PORT = 80,
   IDENTIFICATION_URL,

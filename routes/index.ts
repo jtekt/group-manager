@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { version, author } from "../package.json";
+import { author } from "../package.json";
 import { NEO4J_URL, get_connection_status as neo4j_connected } from "../db";
 
 import router_v1 from "./v1";
@@ -8,6 +8,7 @@ import router_v3 from "./v3";
 import healthRouter from "./health";
 
 import {
+  APP_VERSION,
   IDENTIFICATION_URL,
   OIDC_JWKS_URI,
   API_KEY_MANAGER_URL,
@@ -21,7 +22,7 @@ const router = Router({ mergeParams: true });
 router.get("/", async (req, res) => {
   res.send({
     application_name: "Group Manager",
-    version,
+    version: APP_VERSION,
     author,
     neo4j: {
       url: NEO4J_URL,
