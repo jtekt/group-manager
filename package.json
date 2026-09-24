@@ -1,11 +1,11 @@
 {
   "name": "group_manager",
   "description": "",
-  "main": "group_manager.js",
+  "main": "build/index.js",
   "scripts": {
     "dev": "nodemon -r dotenv/config index.ts",
     "start": "node ./build/index.js",
-    "build": "tsc -p .",
+    "build": "npm run swagger-autogen && tsc -p .",
     "test": "mocha -r ts-node/register test/*.ts --timeout 10000 --exit",
     "coverage": "nyc mocha -r ts-node/register test/*.ts --timeout 15000 --exit",
     "swagger-autogen": "ts-node swagger.ts"

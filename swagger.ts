@@ -17,6 +17,6 @@ const doc = {
 }
 
 const outputFile = "./swagger-output.json"
-const endpointsFiles = ["./index.js"]
+const endpointsFiles = ["./index.ts"]
 
 generate(outputFile, endpointsFiles, doc)
