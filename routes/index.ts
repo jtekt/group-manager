@@ -1,6 +1,10 @@
 import { Router } from "express";
 import { author } from "../package.json";
-import { NEO4J_URL, get_connection_status as neo4j_connected } from "../db";
+import {
+  NEO4J_URL,
+  get_connection_status as neo4j_connected,
+  get_initialized as neo4j_initialized,
+} from "../db";
 
 import router_v1 from "./v1";
 import router_v2 from "./v2";
@@ -27,6 +31,7 @@ router.get("/", async (req, res) => {
     neo4j: {
       url: NEO4J_URL,
       connected: await neo4j_connected(),
+      initialized: neo4j_initialized(),
     },
     auth: {
       identification_url: IDENTIFICATION_URL,

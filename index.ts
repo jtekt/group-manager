@@ -28,24 +28,20 @@ app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 app.use("/", router);
 app.use(errorHandler);
 
-db_init()
-  .then(() => {
-    const server = app.listen(APP_PORT, () => {
-      console.log(`[Express] listening on port ${APP_PORT}`);
-    });
+// The DB setup runs (and retries) in the background: /health/ready answers 503 until it is done
+db_init();
 
-    const shutdown = async () => {
-      console.log("[Express] Shutting down...");
-      server.close(async () => {
-        await db_close();
-        process.exit(0);
-      });
-    };
+const server = app.listen(APP_PORT, () => {
+  console.log(`[Express] listening on port ${APP_PORT}`);
+});
 
-    process.on("SIGTERM", shutdown);
-    process.on("SIGINT", shutdown);
-  })
-  .catch((e) => {
-    console.error(e.message);
-    process.exit(1);
+const shutdown = async () => {
+  console.log("[Express] Shutting down...");
+  server.close(async () => {
+    await db_close();
+    process.exit(0);
   });
+};
+
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
