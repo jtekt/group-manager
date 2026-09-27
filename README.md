@@ -1,8 +1,6 @@
 # Group manager
 
-[![pipeline status](https://gitlab.com/moreillon_k8s/group-manager/group_manager_neo4j/badges/master/pipeline.svg)](https://gitlab.com/moreillon_k8s/group-manager/group_manager_neo4j)
-[![coverage report](https://gitlab.com/moreillon_k8s/group-manager/group_manager_neo4j/badges/master/coverage.svg)](https://gitlab.com/moreillon_k8s/group-manager/group_manager_neo4j)
-[![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/moreillon)](https://artifacthub.io/packages/search?repo=moreillon)
+[![AWS ECR](https://img.shields.io/badge/AWS%20ECR-group--manager-blue)](https://gallery.ecr.aws/jtekt-corporation/group-manager)
 
 As a graph database, Neo4j is a great choice to manage highly relational data. On the other side, a great number of applications feature at least some form of user management system. With Neo4j, those users can be store as nodes and connected to other items via relationships. A typical example would be a blog, where both articles and users are individual nodes while authorships are represented by a relationship.
 
@@ -20,6 +18,8 @@ For more information, please visit the project page [here](https://articles.maxi
 
 ## API
 
+The current API is `/v3`. `/v1` and `/v2` (also served at `/`) are kept for legacy clients. All routes except `/`, `/health` and `/docs` require authentication (see below).
+
 ### Groups
 
 | Endpoint              | Method | query/body | Description                                                          |
@@ -28,13 +28,13 @@ For more information, please visit the project page [here](https://articles.maxi
 | /v3/groups/           | POST   | name       | Creates a group                                                      |
 | /v3/groups/{group_id} | GET    | -          | Returns information about the group corresponding to the provided ID |
 | /v3/groups/{group_id} | PATCH  | properties | Updates properties of a group                                        |
-| /v3/groups/{group_id} | DELETE | -          | Deletes a group                                                      |
+| /v3/groups/{group_id} | DELETE | deep       | Deletes a group; with `deep`, also deletes its subgroups             |
 
 #### GET /v3/groups query parameters
 
 | Parameter   | Description                                                              |
 | ----------- | ------------------------------------------------------------------------ |
-| batch_size  | Number of results per page (default: 100)                                |
+| batch_size  | Number of results per page (default: `DEFAULT_BATCH_SIZE`, 100)          |
 | start_index | Index of the first result (default: 0)                                   |
 | shallow     | If set, only returns top-level groups (groups with no parent)            |
 | direct      | If set, only returns direct subgroups (not transitive ones)              |
@@ -50,9 +50,9 @@ For more information, please visit the project page [here](https://articles.maxi
 
 | Endpoint                                   | Method | query/body | Description                                                          |
 | ------------------------------------------ | ------ | ---------- | -------------------------------------------------------------------- |
-| /v3/groups/{group_id}/groups               | GET    | -          | Returns the groups belonging to the group with the given ID          |
-| /v3/groups/{group_id}/groups/direct        | GET    | -          | Returns the groups directly belonging to the group with the given ID |
+| /v3/groups/{group_id}/groups               | GET    | see above  | Returns the groups belonging to the group with the given ID          |
 | /v3/groups/{group_id}/parent_groups        | GET    | -          | Returns the groups to which the group with the given ID belongs      |
+| /v3/groups/{group_id}/groups               | POST   | group_id   | Puts the group with ID group_id into the group                       |
 | /v3/groups/{group_id}/groups/{subgroup_id} | POST   | -          | Puts a group into another                                            |
 | /v3/groups/{group_id}/groups/{subgroup_id} | DELETE | -          | Removes a subgroup from a group                                      |
 
@@ -64,6 +64,7 @@ For more information, please visit the project page [here](https://articles.maxi
 | /v3/groups/{group_id}/members           | GET    | -                 | Returns the users belonging to the group with the given ID                       |
 | /v3/groups/{group_id}/members           | POST   | user_id, user_ids | Adds one or more users to the group; use 'self' as user_id to join               |
 | /v3/groups/{group_id}/members/{user_id} | DELETE | -                 | Removes a user from the group; use 'self' as user_id to leave                   |
+| /v3/members/{member_id}                 | GET    | -                 | Gets a member                                                                    |
 | /v3/members/groups                      | GET    | user_ids          | Gets the groups of multiple users identified by their respective IDs             |
 | /v3/members/{member_id}/groups          | GET    | -                 | Gets the groups of a member; use 'self' as member_id to get one's own groups    |
 
@@ -72,27 +73,47 @@ For more information, please visit the project page [here](https://articles.maxi
 | Endpoint                                                | Method | query/body | Description                                                                                |
 | ------------------------------------------------------- | ------ | ---------- | ------------------------------------------------------------------------------------------ |
 | /v3/groups/{group_id}/administrators                    | GET    | -          | Returns the administrators of the group with the given ID                                  |
-| /v3/groups/{group_id}/administrators/{administrator_id} | POST   | -          | Adds an administrator to the group                                                         |
+| /v3/groups/{group_id}/administrators                    | POST   | user_id, user_ids | Adds one or more administrators to the group                                        |
 | /v3/groups/{group_id}/administrators/{administrator_id} | DELETE | -          | Removes an administrator from the group                                                    |
-| /v3/administrators/{administrators_id}/groups           | GET    | -          | Gets the groups administrated by a user, here, use 'self' as member_id of one's own groups |
+| /v3/administrators/{administrator_id}/groups            | GET    | -          | Gets the groups administrated by a user; use 'self' for one's own groups                   |
 
 ### Pagination
 
 To limit the size of responses, groups, members and administrators are provided in a paginated manner. The page size and index of the first item on the page can be defined using the query parameters 'batch_size' and 'start_index' respectively.
 
+`members` and `users` are interchangeable in all routes (e.g. `/v3/groups/{group_id}/users`).
+
+### Authentication
+
+Requests are authenticated with one of the following, each enabled when its variable is set (at least one is required):
+
+- an API key in the `X-API-Key` header, validated by the API key manager (`API_KEY_MANAGER_URL`)
+- an OIDC access token (a JWT with a `kid` header), verified against `OIDC_JWKS_URI`
+- a legacy JWT from the user manager, checked against `IDENTIFICATION_URL`
+
+### Service
+
+| Endpoint      | Method | Description                                                    |
+| ------------- | ------ | -------------------------------------------------------------- |
+| /             | GET    | Application info: version, DB connection and setup status      |
+| /health/live  | GET    | Liveness probe: the process responds                           |
+| /health/ready | GET    | Readiness probe: 503 until the DB is set up and reachable      |
+| /docs         | GET    | Swagger UI                                                     |
+
 ## Environment variables
 
-| Variable            | Description                                                                             |
-| ------------------- | --------------------------------------------------------------------------------------- |
-| APP_PORT            | Application that the app listens on                                                     |
-| NEO4J_URL           | URL of the Neo4j database                                                               |
-| NEO4J_USERNAME      | Username for the Neo4j database                                                         |
-| NEO4J_PASSWORD      | Password for the Neo4j database                                                         |
-| OIDC_JWKS_URI       | URI for the JWKS of by the OAuth provider                                               |
-| IDENTIFICATION_URL  | URL of the user identification endpoint (legacy)                                        |
-| DB_USER_ID_FIELDS   | Fields of a Neo4J user record that can be used as identifier                            |
-| AUTH_USER_ID_FIELDS | Fields of the user profile provided by the auth provider that can be used as identifier |
+| Variable             | Description                                                                                          | Default      |
+| -------------------- | ---------------------------------------------------------------------------------------------------- | ------------ |
+| APP_PORT             | Port the app listens on                                                                              | 80           |
+| NEO4J_URL            | URL of the Neo4j database                                                                            | bolt://neo4j |
+| NEO4J_USERNAME       | Username for the Neo4j database                                                                      | neo4j        |
+| NEO4J_PASSWORD       | Password for the Neo4j database                                                                      |              |
+| IDENTIFICATION_URL   | URL of the user identification endpoint for legacy JWTs, e.g. `http://employee-manager/v3/users/self` |              |
+| OIDC_JWKS_URI        | JWKS URI of the OIDC provider                                                                        |              |
+| API_KEY_MANAGER_URL  | URL of the API key manager                                                                           |              |
+| AUTH_USER_ID_FIELDS  | Comma-separated fields of the authenticated user that identify them, besides `_id`; the first one is also used for API keys | |
+| DB_USER_ID_FIELDS    | Comma-separated properties of a Neo4j user that can match those identifiers, besides `_id`           |              |
+| DEFAULT_BATCH_SIZE   | Default page size                                                                                    | 100          |
+| CORS_ALLOWED_ORIGINS | Comma-separated allowed CORS origins; all origins are allowed when unset                             |              |
 
-## Docker image
-
-[![dockeri.co](https://dockeri.co/image/moreillon/group-manager)](https://hub.docker.com/r/moreillon/group-manager)
+The version shown at `/` comes from `APP_VERSION`, set at build time from the git tag (`--build-arg APP_VERSION`).
