@@ -89,6 +89,8 @@ export const add_member_to_group = async (
 
   try {
     const { records } = await session.run(query, params);
+    // FIXME: when the user lacks permission, the WHERE clause above filters the
+    // query out, so the refusal is answered like this instead of with a 403
     if (!records.length)
       throw createHttpError(
         400,
@@ -237,6 +239,8 @@ export const remove_user_from_group = async (
 
   try {
     const { records } = await session.run(query, params);
+    // FIXME: when the user lacks permission, the WHERE clause above filters the
+    // query out, so the refusal is answered like this instead of with a 403
     if (!records.length)
       throw createHttpError(
         400,
