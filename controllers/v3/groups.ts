@@ -271,6 +271,8 @@ export const update_group = async (
 
   try {
     const { records } = await session.run(query, params);
+    // FIXME: when the user lacks permission, the WHERE clause above filters the
+    // query out, so the refusal is answered like this instead of with a 403
     if (!records.length)
       throw createHttpError(400, `Error patching group ${group_id}`);
     console.log(`User ${user_id} patched group ${group_id}`);
@@ -323,6 +325,8 @@ export const delete_group = async (
 
   try {
     const { records } = await session.run(query, { user_id, group_id });
+    // FIXME: when the user lacks permission, the WHERE clause above filters the
+    // query out, so the refusal is answered like this instead of with a 403
     if (!records.length)
       throw createHttpError(404, `Group ${group_id} not found`);
     console.log(`User ${user_id} deleted group ${group_id}`);
@@ -388,6 +392,8 @@ export const add_group_to_group = async (
 
   try {
     const { records } = await session.run(query, params);
+    // FIXME: when the user lacks permission, the WHERE clause above filters the
+    // query out, so the refusal is answered like this instead of with a 403
     if (!records.length)
       throw createHttpError(
         400,
@@ -453,6 +459,8 @@ export const remove_group_from_group = async (
 
   try {
     const { records } = await session.run(query, params);
+    // FIXME: when the user lacks permission, the WHERE clause above filters the
+    // query out, so the refusal is answered like this instead of with a 403
     if (!records.length)
       throw createHttpError(
         400,

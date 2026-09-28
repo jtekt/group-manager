@@ -122,6 +122,8 @@ export const make_user_administrator_of_group = async (
 
   try {
     const { records } = await session.run(query, params);
+    // FIXME: when the user lacks permission, the WHERE clause above filters the
+    // query out, so the refusal is answered like this instead of with a 403
     if (!records.length)
       throw createHttpError(400, `Error adding user to administrators`);
     console.log(`User ${user_id} added administrators to group ${group_id}`);
@@ -178,6 +180,8 @@ export const remove_user_from_administrators = async (
 
   try {
     const { records } = await session.run(query, params);
+    // FIXME: when the user lacks permission, the WHERE clause above filters the
+    // query out, so the refusal is answered like this instead of with a 403
     if (!records.length)
       throw createHttpError(400, `Error removing from administrators`);
     console.log(
