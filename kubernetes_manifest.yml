@@ -22,10 +22,6 @@ spec:
           env:
             - name: IDENTIFICATION_URL
               value: http://employee-manager/v3/users/self
-            - name: OIDC_JWKS_URI
-              value: http://keycloak.keycloak:8080/realms/jtekt/protocol/openid-connect/certs
-            - name: API_KEY_MANAGER_URL
-              value: http://api-key-manager-api:3000
             - name: AUTH_USER_ID_FIELDS
               value: preferred_username
             - name: DB_USER_ID_FIELDS
