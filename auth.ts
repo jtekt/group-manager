@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response, Router } from "express";
+import axios from "axios";
 
-import legacyAuth from "@moreillon/express_identification_middleware";
 import oidcAuth from "@moreillon/express-oidc";
 import apiKeyAuth from "@jtekt/express-api-key-middleware";
 
@@ -11,6 +11,50 @@ import {
   AUTH_USER_ID_FIELDS,
 } from "./config";
 
+// Legacy JWT: from the Authorization header, a jwt or token cookie, or a jwt or
+// token query parameter
+const retrieveLegacyToken = (req: Request): string | undefined => {
+  const fromHeader = req.headers.authorization?.split(" ")[1];
+  if (fromHeader) return fromHeader;
+
+  const cookies: Record<string, string> = {};
+  for (const cookie of (req.headers.cookie ?? "").split(";")) {
+    const separator = cookie.indexOf("=");
+    if (separator === -1) continue;
+    const name = cookie.slice(0, separator).trim();
+    cookies[name] = decodeURIComponent(cookie.slice(separator + 1).trim());
+  }
+  if (cookies.jwt || cookies.token) return cookies.jwt || cookies.token;
+
+  const { jwt, token } = req.query;
+  if (typeof jwt === "string" && jwt) return jwt;
+  if (typeof token === "string" && token) return token;
+};
+
+// Identifies the user of a legacy JWT with the user manager. A missing or
+// rejected token is a 401, so that clients log out; an unreachable or failing
+// user manager is a 502, so that they don't.
+const legacyAuth =
+  (url: string) => async (req: Request, res: Response, next: NextFunction) => {
+    const token = retrieveLegacyToken(req);
+    if (!token) return res.status(401).json({ message: "JWT not provided" });
+
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const { data } = await axios.get(url, { headers });
+      res.locals.user = data;
+    } catch (error: any) {
+      const status = error.response?.status;
+      if (status >= 400 && status < 500)
+        return res.status(401).json({ message: "Invalid JWT" });
+
+      console.error(`[Auth] Legacy identification failed: ${error.message}`);
+      return res.status(502).json({ message: "User identification failed" });
+    }
+
+    next();
+  };
+
 export const registerAuthMiddleware = (router: Router) => {
   let legacyMiddleware: ReturnType<typeof legacyAuth> | null = null;
   let oidcMiddleware: ReturnType<typeof oidcAuth> | null = null;
@@ -19,9 +63,7 @@ export const registerAuthMiddleware = (router: Router) => {
   if (IDENTIFICATION_URL) {
     console.log(`[Auth] Legacy auth enabled with URL: ${IDENTIFICATION_URL}`);
 
-    legacyMiddleware = legacyAuth({
-      url: IDENTIFICATION_URL,
-    });
+    legacyMiddleware = legacyAuth(IDENTIFICATION_URL);
   }
 
   if (OIDC_JWKS_URI) {

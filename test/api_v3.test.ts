@@ -44,9 +44,23 @@ describe("/v3/", () => {
   })
 
   describe("Authentication", () => {
-    it("Should return 401 or 403 when no token is provided", async () => {
+    it("Should return 401 when no token is provided", async () => {
       const { status } = await request(app).get("/v3/groups")
-      expect(status).to.be.oneOf([401, 403])
+      expect(status).to.equal(401)
+    })
+
+    it("Should return 401, not 403, when the token is rejected", async () => {
+      const { status } = await request(app)
+        .get("/v3/groups")
+        .set("Authorization", "Bearer invalid-token")
+      expect(status).to.equal(401)
+    })
+
+    it("Should accept the token from a jwt cookie", async () => {
+      const { status } = await request(app)
+        .get("/v3/groups")
+        .set("Cookie", `jwt=${jwt}`)
+      expect(status).to.equal(200)
     })
   })
 
