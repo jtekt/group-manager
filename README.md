@@ -85,11 +85,7 @@ To limit the size of responses, groups, members and administrators are provided 
 
 ### Authentication
 
-Requests are authenticated with one of the following, each enabled when its variable is set (at least one is required):
-
-- an API key in the `X-API-Key` header, validated by the API key manager (`API_KEY_MANAGER_URL`)
-- an OIDC access token (a JWT with a `kid` header), verified against `OIDC_JWKS_URI`
-- a legacy JWT from the user manager, checked against `IDENTIFICATION_URL`
+Like the other backends, every request is identified by the user manager at `IDENTIFICATION_URL`, using `@jtekt/express-authentication-middleware`. The user manager accepts a legacy JWT or an OIDC access token in the `Authorization: Bearer` header, or an API key in the `X-API-Key` header. A missing or rejected credential is answered with 401.
 
 ### Service
 
@@ -108,10 +104,8 @@ Requests are authenticated with one of the following, each enabled when its vari
 | NEO4J_URL            | URL of the Neo4j database                                                                            | bolt://neo4j |
 | NEO4J_USERNAME       | Username for the Neo4j database                                                                      | neo4j        |
 | NEO4J_PASSWORD       | Password for the Neo4j database                                                                      |              |
-| IDENTIFICATION_URL   | URL of the user identification endpoint for legacy JWTs, e.g. `http://employee-manager/v3/users/self` |              |
-| OIDC_JWKS_URI        | JWKS URI of the OIDC provider                                                                        |              |
-| API_KEY_MANAGER_URL  | URL of the API key manager                                                                           |              |
-| AUTH_USER_ID_FIELDS  | Comma-separated fields of the authenticated user that identify them, besides `_id`; the first one is also used for API keys | |
+| IDENTIFICATION_URL   | URL of the user manager identification endpoint, e.g. `http://employee-manager/v3/users/self` (required) |              |
+| AUTH_USER_ID_FIELDS  | Comma-separated fields of the authenticated user that identify them, besides `_id` | |
 | DB_USER_ID_FIELDS    | Comma-separated properties of a Neo4j user that can match those identifiers, besides `_id`           |              |
 | DEFAULT_BATCH_SIZE   | Default page size                                                                                    | 100          |
 | CORS_ALLOWED_ORIGINS | Comma-separated allowed CORS origins; all origins are allowed when unset                             |              |
