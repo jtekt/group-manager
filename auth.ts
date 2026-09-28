@@ -1,134 +1,24 @@
-import { NextFunction, Request, Response, Router } from "express";
-import axios from "axios";
+import { Router } from "express";
+import middleware, {
+  type Options,
+} from "@jtekt/express-authentication-middleware";
 
-import oidcAuth from "@moreillon/express-oidc";
-import apiKeyAuth from "@jtekt/express-api-key-middleware";
+import { IDENTIFICATION_URL } from "./config";
 
-import {
-  OIDC_JWKS_URI,
-  IDENTIFICATION_URL,
-  API_KEY_MANAGER_URL,
-  AUTH_USER_ID_FIELDS,
-} from "./config";
+// Same setup as the other backends: the user manager identifies every
+// request, whether it carries a legacy JWT, an OIDC token or an API key
+export const registerAuthMiddleware = (router: Router) => {
+  if (!IDENTIFICATION_URL)
+    throw new Error("[Auth] IDENTIFICATION_URL not provided");
 
-// Legacy JWT: from the Authorization header, a jwt or token cookie, or a jwt or
-// token query parameter
-const retrieveLegacyToken = (req: Request): string | undefined => {
-  const fromHeader = req.headers.authorization?.split(" ")[1];
-  if (fromHeader) return fromHeader;
-
-  const cookies: Record<string, string> = {};
-  for (const cookie of (req.headers.cookie ?? "").split(";")) {
-    const separator = cookie.indexOf("=");
-    if (separator === -1) continue;
-    const name = cookie.slice(0, separator).trim();
-    cookies[name] = decodeURIComponent(cookie.slice(separator + 1).trim());
-  }
-  if (cookies.jwt || cookies.token) return cookies.jwt || cookies.token;
-
-  const { jwt, token } = req.query;
-  if (typeof jwt === "string" && jwt) return jwt;
-  if (typeof token === "string" && token) return token;
-};
-
-// Identifies the user of a legacy JWT with the user manager. A missing or
-// rejected token is a 401, so that clients log out; an unreachable or failing
-// user manager is a 502, so that they don't.
-const legacyAuth =
-  (url: string) => async (req: Request, res: Response, next: NextFunction) => {
-    const token = retrieveLegacyToken(req);
-    if (!token) return res.status(401).json({ message: "JWT not provided" });
-
-    try {
-      const headers = { Authorization: `Bearer ${token}` };
-      const { data } = await axios.get(url, { headers });
-      res.locals.user = data;
-    } catch (error: any) {
-      const status = error.response?.status;
-      if (status >= 400 && status < 500)
-        return res.status(401).json({ message: "Invalid JWT" });
-
-      console.error(`[Auth] Legacy identification failed: ${error.message}`);
-      return res.status(502).json({ message: "User identification failed" });
-    }
-
-    next();
+  const options: Options = {
+    strategies: {
+      identification: {
+        url: IDENTIFICATION_URL,
+        identifierField: "_id",
+      },
+    },
   };
 
-export const registerAuthMiddleware = (router: Router) => {
-  let legacyMiddleware: ReturnType<typeof legacyAuth> | null = null;
-  let oidcMiddleware: ReturnType<typeof oidcAuth> | null = null;
-  let apiKeyMiddleware: ReturnType<typeof apiKeyAuth> | null = null;
-
-  if (IDENTIFICATION_URL) {
-    console.log(`[Auth] Legacy auth enabled with URL: ${IDENTIFICATION_URL}`);
-
-    legacyMiddleware = legacyAuth(IDENTIFICATION_URL);
-  }
-
-  if (OIDC_JWKS_URI) {
-    console.log(`[Auth] OIDC auth enabled with JWKS URI: ${OIDC_JWKS_URI}`);
-
-    oidcMiddleware = oidcAuth({
-      jwksUri: OIDC_JWKS_URI,
-    });
-  }
-
-  if (API_KEY_MANAGER_URL) {
-    console.log(
-      `[Auth] API Key auth enabled with validation URL: ${API_KEY_MANAGER_URL}`,
-    );
-
-    apiKeyMiddleware = apiKeyAuth({
-      url: `${API_KEY_MANAGER_URL}/validate`,
-      userIdFieldName: AUTH_USER_ID_FIELDS?.split(",")[0],
-    });
-  }
-
-  const hasAuth = !!legacyMiddleware || !!oidcMiddleware || !!apiKeyMiddleware;
-
-  if (!hasAuth) {
-    throw new Error(
-      "[Auth] No authentication configured. Set IDENTIFICATION_URL, OIDC_JWKS_URI, or API_KEY_MANAGER_URL",
-    );
-  }
-
-  router.use((req: Request, res: Response, next: NextFunction) => {
-    // API Key authentication
-    if (apiKeyMiddleware && req.headers["x-api-key"]) {
-      return apiKeyMiddleware(req, res, next);
-    }
-
-    // JWT authentication
-    // Route to the correct middleware based on the JWT header's kid field.
-    // Legacy JWTs never carry a kid; OIDC JWTs always do (required for JWKS
-    // key lookup). This lets us avoid running both middlewares on every request.
-    const token = req.headers.authorization?.split(" ")[1];
-
-    let hasKid = false;
-
-    if (token) {
-      try {
-        const header = JSON.parse(
-          Buffer.from(token.split(".")[0], "base64url").toString("utf8"),
-        );
-
-        hasKid = !!header.kid;
-      } catch {
-        // Malformed token — let the selected middleware produce the error
-      }
-    }
-
-    if (hasKid && oidcMiddleware) {
-      return oidcMiddleware(req, res, next);
-    }
-
-    if (legacyMiddleware) {
-      return legacyMiddleware(req, res, next);
-    }
-
-    return res.status(401).json({
-      message: "Unauthorized",
-    });
-  });
+  router.use(middleware(options));
 };

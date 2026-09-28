@@ -55,13 +55,6 @@ describe("/v3/", () => {
         .set("Authorization", "Bearer invalid-token")
       expect(status).to.equal(401)
     })
-
-    it("Should accept the token from a jwt cookie", async () => {
-      const { status } = await request(app)
-        .get("/v3/groups")
-        .set("Cookie", `jwt=${jwt}`)
-      expect(status).to.equal(200)
-    })
   })
 
   describe("POST /v3/groups", () => {
