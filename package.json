@@ -3,7 +3,7 @@
   "description": "",
   "main": "build/index.js",
   "scripts": {
-    "dev": "nodemon -r dotenv/config index.ts",
+    "dev": "npm run swagger-autogen && nodemon -r dotenv/config index.ts",
     "start": "node ./build/index.js",
     "build": "npm run swagger-autogen && tsc -p .",
     "test": "mocha -r ts-node/register test/*.ts --timeout 10000 --exit",
